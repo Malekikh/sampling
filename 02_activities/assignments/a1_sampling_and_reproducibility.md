@@ -18,35 +18,40 @@ Alter the code so that it is reproducible. Describe the changes you made to the 
 Please write your explanation here...
 
 ## portion 1
-The model uses random sampling for infection assignment and conditional sampling for tracing.
+This simulation uses a multi stage sampling procedure. 
 
-Sample size is 1000 people.
-Sampling frame is people attending events during covid. 
-Distribution of 800 attending brunch and 200 wedding will cause an inbalance. 
+First starting with random sampling for infection assignment - A random sample of indices from the DataFrame is selected.
+sample size here for infected people is 10% of the 1000 ppl. In this case, every individual has an equal chance of being selected (sampling without replacement).
 
-Functions showing these are as below:
-
-# Constants representing the parameters of the model
-ATTACK_RATE = 0.10
-TRACE_SUCCESS = 0.20
-SECONDARY_TRACE_THRESHOLD = 2
- # Explicitly set 'traced' column to nullable boolean type
-  ppl['traced'] = ppl['traced'].astype(pd.BooleanDtype())
-
-  # Infect a random subset of people
   infected_indices = np.random.choice(ppl.index, size=int(len(ppl) * ATTACK_RATE), replace=False)
   ppl.loc[infected_indices, 'infected'] = True
 
-  # Primary contact tracing: randomly decide which infected people get traced
-  ppl.loc[ppl['infected'], 'traced'] = np.random.rand(sum(ppl['infected'])) < TRACE_SUCCESS
+
+Second part is the tacing among the infected people. For each infected individual, a random number is drawn from a uniform distribution between 0 and 1.  If the random number is less than 0.20 (TRACE_SUCCESS), that individual is marked as traced.
+
+    ppl.loc[ppl['infected'], 'traced'] = np.random.rand(sum(ppl['infected'])) < TRACE_SUCCESS
 
 
+third part for second tracing, it counts the number of traced individuals per event type. Identify event types (e.g., 'wedding' or 'brunch') that meet or exceed the threshold (at least 2 traced cases). For these events, any infected individual is then marked as traced (secondary tracing). based on my search, this portion is called condition based sampling applied after observing the data. 
+
+  event_trace_counts = ppl[ppl['traced'] == True]['event'].value_counts()
+  events_traced = event_trace_counts[event_trace_counts >= SECONDARY_TRACE_THRESHOLD].index
+  ppl.loc[ppl['event'].isin(events_traced) & ppl['infected'], 'traced'] = True
+
+sample frame: indivisuals attending both events.
+  events = ['wedding'] * 200 + ['brunch'] * 800
+  ppl = pd.DataFrame({
+      'event': events,
+      'infected': False,
+      'traced': np.nan  # Initially setting traced status as NaN
+  })
+
+sample size: 1000 which is total of 800 + 200 people attending events
+results = [simulate_event(m) for m in range(1000)]
 
 # portion 2 
 
-No it is not producing same results as the sampling approaches are different. Here we are dealing with systematic sampling but the blog approach is stratification. It uses 10% of each group wedding attendees and brunch atendees. 
-Looking at the plots our taced values are alot closer to cases than what was observed in the blog. 
-also, blog’s approach shows equal infection probabilities per event, while your model assigns infections randomly.
+Yes they both produce same graph results using same methodology and procedure. The only difference would be that blog is using 50,000 iterations as opposed to our code that is iterating 1000 only. But at the end we are getting similar outcomes. 
 
 # portion 3
 When reducing the number of repetitions to 100 instead of 1000, we observe greater variation in results. Reproducibility decreases because the lower number of trials increases randomness in each run.
